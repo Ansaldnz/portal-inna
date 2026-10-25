@@ -25,20 +25,56 @@ if os.path.exists("48997.jpg"):
     </div>
     """
 
-# --- ESTILOS CSS PERSONALIZADOS (MODO OSCURO COMPATIBLE) ---
+# --- ESTILOS CSS PERSONALIZADOS (#B0C4DE de fondo y #FFFF00 en el banner) ---
 st.markdown(
     """
     <style>
-    /* Fondo azul pastel sutil y elegante para toda la aplicación */
+    /* Fondo de pantalla general con el color #B0C4DE */
     .stApp {
-        background-color: #eaf0f6 !important;
+        background-color: #B0C4DE !important;
         color: #1e3d59 !important;
     }
 
-    /* Forzar que los textos generales sean oscuros */
-    html, body, [class*="st-"], p, span, label {
+    /* Textos generales legibles y oscuros para accesibilidad */
+    .stMarkdown p, .stMarkdown span, label, .stRadio label, .stCheckbox label {
         color: #1e3d59 !important;
         font-size: 18px !important;
+    }
+
+    /* GARANTIZAR ALTO CONTRASTE EN CAMPOS DE ENTRADA */
+    input, textarea {
+        background-color: #ffffff !important;
+        color: #1e3d59 !important;
+        border: 2px solid #000080 !important;
+        border-radius: 8px !important;
+        font-size: 18px !important;
+    }
+
+    /* ESTILO PARA EL BANNER DE NUEVA CARRERA CON COLOR #FFFF00 */
+    .banner-carrera {
+        background-color: #FFFF00 !important;
+        border: 3px solid #000080 !important;
+        padding: 25px;
+        border-radius: 15px;
+        text-align: center;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+        margin-bottom: 25px;
+    }
+    .banner-carrera h2 {
+        color: #000080 !important;
+        margin-bottom: 5px;
+        font-weight: bold;
+    }
+    .banner-carrera h3 {
+        color: #000080 !important;
+        margin-top: 0;
+        font-weight: bold;
+    }
+    .banner-carrera p {
+        color: #1e3d59 !important;
+        margin-bottom: 0;
+        font-size: 18px !important;
+        font-weight: 600;
     }
 
     /* Excepción: Botones principales mantienen texto blanco */
@@ -69,7 +105,7 @@ st.markdown(
         color: #1e3d59 !important;
     }
 
-    /* Botones principales en color #FFA500 (Naranja) */
+    /* Botones principales en color #FFA500 (Naranja/Azafrán) */
     div.stButton > button {
         background-color: #FFA500 !important;
         font-size: 18px !important;
@@ -126,17 +162,15 @@ def inicializar_base_datos():
         )
     """)
 
-  cursor.execute("PRAGMA table_info(usuarios)")
-  columnas = [columna[1] for columna in cursor.fetchall()]
-
-  if "custom_id" not in columnas:
-    cursor.execute("ALTER TABLE usuarios ADD COLUMN custom_id TEXT")
-  if "rol" not in columnas:
-    cursor.execute("ALTER TABLE usuarios ADD COLUMN rol TEXT DEFAULT 'alumno'")
-  if "docente" not in columnas:
-    cursor.execute("ALTER TABLE usuarios ADD COLUMN docente TEXT")
-  if "grado_seccion" not in columnas:
-    cursor.execute("ALTER TABLE usuarios ADD COLUMN grado_seccion TEXT")
+  # Tabla para el buzón confidencial de sugerencias de estudiantes
+  cursor.execute("""
+        CREATE TABLE IF NOT EXISTS sugerencias_privadas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            estudiante TEXT NOT NULL,
+            sugerencia TEXT NOT NULL,
+            fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
 
   conexion.commit()
   conexion.close()
@@ -236,7 +270,7 @@ if "indice_carrusel" not in st.session_state:
 if st.session_state["usuario_logueado"]:
   st.markdown(banner_html, unsafe_allow_html=True)
 
-  # --- PANEL DE ADMINISTRACIÓN ---
+  # --- PANEL DE ADMINISTRACIÓN GLOBAL (ALUMNOS Y DOCENTES) ---
   if st.session_state["usuario_logueado"] == "ADMINISTRADOR":
     st.markdown(
         "<h1 style='text-align: center; color: #000080; font-size: 38px;'>🛠️"
@@ -245,7 +279,8 @@ if st.session_state["usuario_logueado"]:
     )
     st.markdown(
         "<p style='text-align: center;'>Bienvenido, Administrador. Gestiona"
-        " usuarios, estudiantes, docentes y opiniones.</p>",
+        " cuentas de estudiantes y docentes, opiniones públicas y buzón"
+        " privado.</p>",
         unsafe_allow_html=True,
     )
     st.markdown("---")
@@ -277,7 +312,7 @@ if st.session_state["usuario_logueado"]:
 
     registros = cursor.fetchall()
 
-    st.subheader("📋 Lista de Registros en el Sistema")
+    st.subheader("📋 Lista General de Registros (Estudiantes y Docentes)")
     if registros:
       df = pd.DataFrame(
           registros,
@@ -297,7 +332,7 @@ if st.session_state["usuario_logueado"]:
 
       with col_adm1:
         st.markdown("<div class='admin-card'>", unsafe_allow_html=True)
-        st.subheader("✏️ Actualizar Registro")
+        st.subheader("✏️ Actualizar Registro (Cualquier Rol)")
         id_actualizar = st.selectbox(
             "Selecciona ID del usuario a modificar",
             options=[r[0] for r in registros],
@@ -312,7 +347,7 @@ if st.session_state["usuario_logueado"]:
         datos_actuales = cursor.fetchone()
 
         st.info(
-            f"🆔 ID Único: **{datos_actuales[0] if datos_actuales else 'Sin asignar'}** | 📌 Rol: **{datos_actuales[1].capitalize() if datos_actuales else ''}**"
+            f"🆔 ID Único: **{datos_actuales[0] if datos_actuales else 'Sin asignar'}** | 📌 Rol actual: **{datos_actuales[1].capitalize() if datos_actuales else ''}**"
         )
 
         nuevo_nombre = st.text_input(
@@ -321,7 +356,7 @@ if st.session_state["usuario_logueado"]:
             key="up_nombre",
         )
         nuevo_rol = st.selectbox(
-            "Rol",
+            "Rol en el sistema",
             options=["alumno", "docente"],
             index=0 if datos_actuales[1] == "alumno" else 1,
             key="up_rol",
@@ -334,7 +369,7 @@ if st.session_state["usuario_logueado"]:
             else lista_docentes_admin[0]
         )
         nuevo_docente = st.selectbox(
-            "Docente encargado",
+            "Docente encargado (para alumnos)",
             options=lista_docentes_admin,
             index=lista_docentes_admin.index(docente_actual),
             key="up_docente",
@@ -347,7 +382,7 @@ if st.session_state["usuario_logueado"]:
             else lista_grados_admin[0]
         )
         nuevo_grado = st.selectbox(
-            "Grado y sección",
+            "Grado y sección (o a cargo)",
             options=lista_grados_admin,
             index=lista_grados_admin.index(grado_actual),
             key="up_grado",
@@ -357,7 +392,7 @@ if st.session_state["usuario_logueado"]:
             "Nueva contraseña (opcional)", type="password", key="up_pass"
         )
 
-        if st.button("Guardar Cambios"):
+        if st.button("Guardar Cambios de Usuario"):
           if not nuevo_nombre:
             st.warning("⚠️ El nombre completo no puede estar vacío.")
           else:
@@ -394,14 +429,14 @@ if st.session_state["usuario_logueado"]:
 
       with col_adm2:
         st.markdown("<div class='admin-card'>", unsafe_allow_html=True)
-        st.subheader("🗑️ Eliminar Usuario")
+        st.subheader("🗑️ Eliminar Registro")
         id_eliminar = st.selectbox(
             "Selecciona ID del usuario a eliminar",
             options=[r[0] for r in registros],
             key="sel_elim",
         )
 
-        if st.button("Eliminar Registro", type="primary"):
+        if st.button("Eliminar Registro del Sistema", type="primary"):
           cursor.execute("DELETE FROM usuarios WHERE id = ?", (id_eliminar,))
           conexion.commit()
           st.success("🗑️ ¡Usuario eliminado de la base de datos!")
@@ -409,7 +444,39 @@ if st.session_state["usuario_logueado"]:
         st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("---")
-    st.subheader("💬 Moderación de Opiniones Anónimas")
+    st.subheader("🔒 Buzón de Sugerencias Privado (Estudiantes)")
+    cursor.execute(
+        "SELECT id, estudiante, sugerencia, fecha FROM sugerencias_privadas"
+        " ORDER BY id DESC"
+    )
+    sugerencias_privadas = cursor.fetchall()
+
+    if sugerencias_privadas:
+      st.info(
+          "📬 Estas sugerencias son confidenciales y solo pueden ser vistas"
+          " por el administrador."
+      )
+      for sug_id, sug_est, sug_text, sug_fecha in sugerencias_privadas:
+        col_sug1, col_sug2 = st.columns([4, 1])
+        with col_sug1:
+          st.write(
+              f"• **Enviado por:** {sug_est} *(Fecha: {sug_fecha})*<br>💬"
+              f" <i>\"{sug_text}\"</i>",
+              unsafe_allow_html=True,
+          )
+        with col_sug2:
+          if st.button("Eliminar Sugerencia", key=f"del_sug_{sug_id}"):
+            cursor.execute(
+                "DELETE FROM sugerencias_privadas WHERE id = ?", (sug_id,)
+            )
+            conexion.commit()
+            st.success("Sugerencia privada eliminada.")
+            st.rerun()
+    else:
+      st.info("No hay sugerencias privadas en el buzón actualmente.")
+
+    st.markdown("---")
+    st.subheader("💬 Moderación de Opiniones Públicas")
     cursor.execute("SELECT id, comentario, fecha FROM opiniones ORDER BY id DESC")
     lista_opiniones = cursor.fetchall()
 
@@ -419,13 +486,13 @@ if st.session_state["usuario_logueado"]:
         with col_op1:
           st.write(f"• **\"{op_text}\"** *(Publicado: {op_fecha})*")
         with col_op2:
-          if st.button("Eliminar", key=f"del_op_{op_id}"):
+          if st.button("Eliminar Opinión", key=f"del_op_{op_id}"):
             cursor.execute("DELETE FROM opiniones WHERE id = ?", (op_id,))
             conexion.commit()
-            st.success("Opinión eliminada.")
+            st.success("Opinión pública eliminada.")
             st.rerun()
     else:
-      st.info("No hay opiniones registradas aún.")
+      st.info("No hay opiniones públicas registradas aún.")
 
     conexion.close()
 
@@ -447,7 +514,6 @@ if st.session_state["usuario_logueado"]:
     )
     perfil = cursor.fetchone()
 
-    # Si es un usuario antiguo sin custom_id, generarlo
     if perfil and not perfil[0]:
       nuevo_id = generar_id_personalizado(perfil[1], cursor)
       cursor.execute(
@@ -492,41 +558,115 @@ if st.session_state["usuario_logueado"]:
                     <hr style='margin: 10px 0;'>
                     <p><b>🆔 ID Personalizado:</b> {custom_id}</p>
                     <p><b>🎓 Nombre Completo:</b> {nombre_usuario}</p>
-                    <p><b>🏫 Grado y Sección a Cargo:</b> {grado_seccion if grado_seccion else 'No asignado'}</p>
+                    <p><b>🏫 Grado y Sección a Cargo:</b> {grado_seccion if grado_seccion else 'No tiene grado a cargo (Docente por asignatura)'}</p>
                 </div>
                 """,
             unsafe_allow_html=True,
         )
 
+        if grado_seccion:
+          st.markdown("<br>", unsafe_allow_html=True)
+          st.subheader(
+              f"👥 Estudiantes de tu Grado y Sección a Cargo: {grado_seccion}"
+          )
+
+          cursor.execute(
+              "SELECT custom_id, usuario, docente FROM usuarios WHERE rol ="
+              " 'alumno' AND grado_seccion = ?",
+              (grado_seccion,),
+          )
+          estudiantes_grado = cursor.fetchall()
+
+          if estudiantes_grado:
+            df_est = pd.DataFrame(
+                estudiantes_grado,
+                columns=[
+                    "ID Único",
+                    "Nombre del Estudiante",
+                    "Docente Encargado",
+                ],
+            )
+            st.dataframe(df_est, use_container_width=True)
+          else:
+            st.info(
+                "ℹ️ Aún no hay estudiantes registrados en este grado y sección."
+            )
+
+        # Buscador de estudiantes por grado y sección para docentes
         st.markdown("<br>", unsafe_allow_html=True)
-        st.subheader(
-            f"👥 Estudiantes del Grado y Sección: {grado_seccion}"
+        st.markdown("<div class='admin-card'>", unsafe_allow_html=True)
+        st.subheader("🔍 Buscador de Estudiantes por Grado y Sección")
+        st.write(
+            "Selecciona cualquier grado y sección para consultar la lista de"
+            " alumnos matriculados:"
         )
 
-        # Consultar estudiantes de este grado/sección
-        cursor.execute(
-            "SELECT custom_id, usuario, docente FROM usuarios WHERE rol ="
-            " 'alumno' AND grado_seccion = ?",
-            (grado_seccion,),
+        grado_a_buscar = st.selectbox(
+            "Elige un grado y sección para consultar",
+            lista_grados_global,
+            key="docente_buscador_grado",
         )
-        estudiantes_grado = cursor.fetchall()
 
-        if estudiantes_grado:
-          df_est = pd.DataFrame(
-              estudiantes_grado,
-              columns=[
-                  "ID Único",
-                  "Nombre del Estudiante",
-                  "Docente Encargado",
-              ],
+        if grado_a_buscar != "Seleccione un grado y sección...":
+          cursor.execute(
+              "SELECT custom_id, usuario, docente FROM usuarios WHERE rol ="
+              " 'alumno' AND grado_seccion = ?",
+              (grado_a_buscar,),
           )
-          st.dataframe(df_est, use_container_width=True)
-        else:
-          st.info(
-              "ℹ️ Aún no hay estudiantes registrados en este grado y sección."
-          )
+          alumnos_busqueda = cursor.fetchall()
 
-      # --- PERFIL DE ESTUDIANTE / ALUMNO ---
+          if alumnos_busqueda:
+            st.success(
+                f"Mostrando estudiantes para: **{grado_a_buscar}**"
+            )
+            df_busqueda = pd.DataFrame(
+                alumnos_busqueda,
+                columns=[
+                    "ID Único",
+                    "Nombre del Estudiante",
+                    "Docente Encargado",
+                ],
+            )
+            st.dataframe(df_busqueda, use_container_width=True)
+          else:
+            st.info(f"No hay estudiantes registrados en **{grado_a_buscar}**.")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        # Opinión anónima para docentes
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("<div class='admin-card'>", unsafe_allow_html=True)
+        st.subheader("💬 Tu opinión sobre trabajar en el INNA")
+        st.write(
+            "¿Qué es lo que más te gusta de formar parte del equipo docente del"
+            " Instituto Nacional de Nahuizalco? Tu comentario aparecerá de"
+            " forma **totalmente anónima** en la página de inicio:"
+        )
+
+        opinion_docente = st.text_area(
+            "Escribe aquí tu experiencia o comentario positivo:",
+            placeholder=(
+                "Ejemplo: Me inspira ver el compromiso y deseo de superación"
+                " de nuestros jóvenes..."
+            ),
+            key="doc_opinion_input",
+        )
+
+        if st.button("Enviar Opinión (Docente)", type="primary"):
+          if not opinion_docente.strip():
+            st.warning("⚠️ Por favor escribe un comentario antes de enviar.")
+          else:
+            cursor.execute(
+                "INSERT INTO opiniones (comentario) VALUES (?)",
+                (opinion_docente.strip(),),
+            )
+            conexion.commit()
+            st.success(
+                "🎉 ¡Muchas gracias por compartir tu experiencia! Ya ha sido"
+                " publicada de forma anónima."
+            )
+        st.markdown("</div>", unsafe_allow_html=True)
+
+      # --- PERFIL DE ESTUDIANTE / ALUMNO (CON BUZÓN PRIVADO Y OPINIÓN PÚBLICA) ---
       else:
         st.markdown(
             f"""
@@ -542,7 +682,7 @@ if st.session_state["usuario_logueado"]:
             unsafe_allow_html=True,
         )
 
-        # Cuadro de opinión anónima para estudiantes
+        # 1. Cuadro de opinión pública
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("<div class='admin-card'>", unsafe_allow_html=True)
         st.subheader("💬 Danos tu opinión sobre el INNA")
@@ -553,7 +693,7 @@ if st.session_state["usuario_logueado"]:
         )
 
         nueva_opinion = st.text_area(
-            "Escribe aquí tu comentario positivo:",
+            "Escribe aquí tu comentario positivo público:",
             placeholder=(
                 "Ejemplo: Me encanta la dedicación de los profesores y los"
                 " nuevos talleres..."
@@ -561,7 +701,7 @@ if st.session_state["usuario_logueado"]:
             key="user_opinion",
         )
 
-        if st.button("Enviar Opinión Anónima", type="primary"):
+        if st.button("Enviar Opinión Pública", type="primary"):
           if not nueva_opinion.strip():
             st.warning("⚠️ Por favor escribe un comentario antes de enviar.")
           else:
@@ -572,7 +712,42 @@ if st.session_state["usuario_logueado"]:
             conexion.commit()
             st.success(
                 "🎉 ¡Muchas gracias por tu opinión! Ya ha sido publicada de"
-                " forma anónima."
+                " forma anónima en el portal."
+            )
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        # 2. Buzón de sugerencias privado (Solo visible para el administrador)
+        space = st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("<div class='admin-card' style='border-left: 6px solid #FFA500;'>", unsafe_allow_html=True)
+        st.subheader("🔒 Buzón Confidencial de Sugerencias")
+        st.write(
+            "¿Tienes alguna sugerencia, reporte o propuesta privada? Escríbela"
+            " aquí. **Este mensaje es 100% seguro y confidencial**: solo podrá"
+            " ser leído por el Administrador de la institución."
+        )
+
+        sugerencia_privada = st.text_area(
+            "Escribe tu sugerencia privada:",
+            placeholder=(
+                "Ejemplo: Sugiero que se habiliten más recursos en la biblioteca"
+                " o apoyo en..."
+            ),
+            key="user_sugerencia_privada",
+        )
+
+        if st.button("Enviar Sugerencia Confidencial", type="primary"):
+          if not sugerencia_privada.strip():
+            st.warning("⚠️ Por favor escribe una sugerencia antes de enviar.")
+          else:
+            cursor.execute(
+                "INSERT INTO sugerencias_privadas (estudiante, sugerencia)"
+                " VALUES (?, ?)",
+                (nombre_usuario, sugerencia_privada.strip()),
+            )
+            conexion.commit()
+            st.success(
+                "🔒 ¡Tu sugerencia ha sido enviada de forma completamente"
+                " confidencial al Administrador!"
             )
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -602,8 +777,8 @@ else:
       unsafe_allow_html=True,
   )
   st.markdown(
-      "<p style='text-align: center; color: #575757;'>MINEDUCYT - Código:"
-      " 10754 | Portal de Acceso Estudiantil y Docente</p>",
+      "<p style='text-align: center; color: #575757; font-size: 14px;'>MINEDUCYT -"
+      " Código: 10754 | Portal de Acceso Estudiantil y Docente</p>",
       unsafe_allow_html=True,
   )
   st.markdown("---")
@@ -634,7 +809,7 @@ else:
     st.subheader("🌟 Lo que nuestra comunidad dice del INNA")
     st.write(
         "Lee las experiencias y opiniones reales compartidas anónimamente por"
-        " nuestros estudiantes:"
+        " nuestros estudiantes y docentes:"
     )
 
     conexion = sqlite3.connect("sistema_usuarios.db")
@@ -649,7 +824,7 @@ else:
             f"""
                 <div class="opinion-card">
                     <p style="margin: 0; color: #1e3d59;">“{op[0]}”</p>
-                    <p style="margin-top: 5px; margin-bottom: 0; text-align: right; font-size: 14px; font-weight: bold; color: #000080;">— Estudiante del INNA (Anónimo)</p>
+                    <p style="margin-top: 5px; margin-bottom: 0; text-align: right; font-size: 14px; font-weight: bold; color: #000080;">— Comunidad INNA (Anónimo)</p>
                 </div>
                 """,
             unsafe_allow_html=True,
@@ -659,7 +834,7 @@ else:
           """
             <div class="opinion-card">
                 <p style="margin: 0; color: #1e3d59;">“Ser parte del Instituto Nacional de Nahuizalco es una experiencia increíble de crecimiento académico y valores.”</p>
-                <p style="margin-top: 5px; margin-bottom: 0; text-align: right; font-size: 14px; font-weight: bold; color: #000080;">— Estudiante del INNA (Anónimo)</p>
+                <p style="margin-top: 5px; margin-bottom: 0; text-align: right; font-size: 14px; font-weight: bold; color: #000080;">— Comunidad INNA (Anónimo)</p>
             </div>
             """,
           unsafe_allow_html=True,
@@ -669,10 +844,10 @@ else:
   with menu[1]:
     st.markdown(
         """
-        <div style="background: linear-gradient(135deg, #1e3d59 0%, #000080 100%); padding: 25px; border-radius: 15px; color: white; text-align: center; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15); margin-bottom: 25px;">
-            <h2 style="color: #FFA500; margin-bottom: 5px;">⚡ ¡APERTURAMOS NUEVA CARRERA! ⚡</h2>
-            <h3 style="color: white; margin-top: 0;">Sistemas Eléctricos y Energías Renovables</h3>
-            <p style="margin-bottom: 0; font-size: 16px;">¡Matrícula Abierta! Sé parte de una nueva generación de profesionales técnicos altamente capacitados.</p>
+        <div class="banner-carrera">
+            <h2>⚡ ¡APERTURAMOS NUEVA CARRERA! ⚡</h2>
+            <h3>Sistemas Eléctricos y Energías Renovables</h3>
+            <p>¡Matrícula Abierta! Sé parte de una nueva generación de profesionales técnicos altamente capacitados.</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -755,11 +930,10 @@ else:
           st.session_state["indice_carrusel"] = i
           st.rerun()
 
-  # --- SECCIÓN 3: REGISTRO CON OPCIÓN DE ALUMNO O DOCENTE ---
+  # --- SECCIÓN 3: REGISTRO ---
   with menu[2]:
     st.subheader("Registro de Nueva Cuenta")
 
-    # Selector de Tipo de Usuario
     tipo_registro = st.radio(
         "¿Qué tipo de usuario eres?",
         ["Estudiante / Alumno", "Docente"],
@@ -816,7 +990,7 @@ else:
 
       if st.button("Completar Registro de Estudiante", type="primary"):
         if (
-            not nuevo_usuario_est
+            not nuevo_usuario_est.strip()
             or docente_reg == "Seleccione un docente..."
             or grado_reg == "Seleccione un grado y sección..."
             or not nuevo_pass_est
@@ -828,12 +1002,15 @@ else:
         else:
           conexion = sqlite3.connect("sistema_usuarios.db")
           cursor = conexion.cursor()
+          # Validar si ya existe el nombre completo
           cursor.execute(
-              "SELECT * FROM usuarios WHERE usuario = ?", (nuevo_usuario_est,)
+              "SELECT * FROM usuarios WHERE LOWER(usuario) = LOWER(?)",
+              (nuevo_usuario_est.strip(),),
           )
           if cursor.fetchone():
             st.error(
-                "❌ El estudiante ya se encuentra registrado en el sistema."
+                "❌ Ya existe una cuenta registrada con este nombre y apellido."
+                " No se permiten cuentas duplicadas."
             )
           else:
             nivel = evaluar_contrasena(nuevo_pass_est)
@@ -849,14 +1026,16 @@ else:
               password_final = nuevo_pass_est
 
             if password_final:
-              custom_id = generar_id_personalizado(nuevo_usuario_est, cursor)
+              custom_id = generar_id_personalizado(
+                  nuevo_usuario_est.strip(), cursor
+              )
               pass_hash = hashlib.sha256(password_final.encode()).hexdigest()
               cursor.execute(
                   "INSERT INTO usuarios (custom_id, usuario, password, rol,"
                   " docente, grado_seccion) VALUES (?, ?, ?, 'alumno', ?, ?)",
                   (
                       custom_id,
-                      nuevo_usuario_est,
+                      nuevo_usuario_est.strip(),
                       pass_hash,
                       docente_reg,
                       grado_reg,
@@ -871,14 +1050,22 @@ else:
 
     # --- FORMULARIO DE DOCENTE ---
     else:
-      docente_nombre_reg = st.selectbox(
-          "Nombre completo del docente",
-          lista_docentes_global,
-          key="reg_doc_nombre",
+      docente_nombre_reg = st.text_input(
+          "Nombre completo del docente", key="reg_doc_nombre_libre"
       )
-      grado_cargo_reg = st.selectbox(
-          "Grado y Sección a cargo", lista_grados_global, key="reg_doc_grado"
+
+      tiene_grado = st.radio(
+          "¿Tiene grado a su cargo?", ["No", "Sí"], horizontal=True, key="r_cargo"
       )
+
+      grado_cargo_reg = None
+      if tiene_grado == "Sí":
+        grado_cargo_reg = st.selectbox(
+            "Seleccione el Grado y Sección a cargo",
+            lista_grados_global,
+            key="reg_doc_grado",
+        )
+
       nuevo_pass_doc = st.text_input(
           "Contraseña deseada", type="password", key="reg_doc_pass"
       )
@@ -910,23 +1097,27 @@ else:
           )
 
       if st.button("Completar Registro de Docente", type="primary"):
-        if (
-            docente_nombre_reg == "Seleccione un docente..."
-            or grado_cargo_reg == "Seleccione un grado y sección..."
-            or not nuevo_pass_doc
+        if not docente_nombre_reg.strip() or not nuevo_pass_doc or (
+            tiene_grado == "Sí"
+            and grado_cargo_reg == "Seleccione un grado y sección..."
         ):
           st.warning(
-              "⚠️ Todos los campos son obligatorios. Por favor selecciona tu"
-              " nombre, grado a cargo y contraseña."
+              "⚠️ Todos los campos obligatorios deben completarse. Por favor"
+              " escribe tu nombre y contraseña."
           )
         else:
           conexion = sqlite3.connect("sistema_usuarios.db")
           cursor = conexion.cursor()
+          # Validar si ya existe el nombre completo
           cursor.execute(
-              "SELECT * FROM usuarios WHERE usuario = ?", (docente_nombre_reg,)
+              "SELECT * FROM usuarios WHERE LOWER(usuario) = LOWER(?)",
+              (docente_nombre_reg.strip(),),
           )
           if cursor.fetchone():
-            st.error("❌ Este docente ya se encuentra registrado en el sistema.")
+            st.error(
+                "❌ Ya existe una cuenta registrada con este nombre y apellido."
+                " No se permiten cuentas duplicadas."
+            )
           else:
             nivel = evaluar_contrasena(nuevo_pass_doc)
             password_final = ""
@@ -941,17 +1132,26 @@ else:
               password_final = nuevo_pass_doc
 
             if password_final:
-              custom_id = generar_id_personalizado(docente_nombre_reg, cursor)
+              custom_id = generar_id_personalizado(
+                  docente_nombre_reg.strip(), cursor
+              )
               pass_hash = hashlib.sha256(password_final.encode()).hexdigest()
+              grado_final = (
+                  grado_cargo_reg
+                  if tiene_grado == "Sí"
+                  and grado_cargo_reg != "Seleccione un grado y sección..."
+                  else None
+              )
+
               cursor.execute(
                   "INSERT INTO usuarios (custom_id, usuario, password, rol,"
                   " docente, grado_seccion) VALUES (?, ?, ?, 'docente', NULL,"
                   " ?)",
                   (
                       custom_id,
-                      docente_nombre_reg,
+                      docente_nombre_reg.strip(),
                       pass_hash,
-                      grado_cargo_reg,
+                      grado_final,
                   ),
               )
               conexion.commit()
@@ -981,14 +1181,14 @@ else:
           cursor = conexion.cursor()
           cursor.execute(
               "SELECT * FROM usuarios WHERE usuario = ? AND password = ?",
-              (user_log, pass_hash),
+              (user_log.strip(), pass_hash),
           )
           resultado = cursor.fetchone()
           conexion.close()
 
           if resultado:
             st.balloons()
-            st.session_state["usuario_logueado"] = user_log
+            st.session_state["usuario_logueado"] = resultado[2]
             st.rerun()
           else:
             st.error("❌ Usuario o contraseña incorrectos. Verifica tus datos.")
